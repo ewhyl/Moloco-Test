@@ -183,4 +183,4 @@ print(c(mse1,mse2,mse3,mse4,mse4,mse6,mse7,mse8))
 ```
 Model 7 has the lowest MSE and Model 2 has the largest MSE. Models 6-8 which have the transformation on variable A seem to have lower MSE than Models 1-5 which have the transformation on variable B.
 
-Overall, using AIC, BIC, and adjusted R2 as seleection criteria, model 6 seem to be the best fitting model with I(A^2) and B.
+Overall, using AIC, BIC, and adjusted R2 as selection criteria, model 6 seem to be the best fitting model with I(A^2) and B.
