@@ -1,0 +1,186 @@
+---
+title: "Moloco Data Analyst Intern Test - Regression"
+author: "Esther Lim"
+date: "5/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(gsheet)
+library(leaps)
+```
+
+## Regression
+```{r}
+# retrieve data from google sheet
+gsheet <- gsheet2text("https://docs.google.com/spreadsheets/d/1AV-A1uhQqvF6h0_a-fupFQIHv6W7-vNm88AYh_WzeB0/edit#gid=1646189991")
+data <- read.csv(text = gsheet, stringsAsFactors=FALSE, header = FALSE, col.names = c("A","B","C"))
+```
+
+# EDA
+```{r}
+# name variables
+A <- data$A
+B <- data$B
+C <- data$C
+
+# Summary of the dataset
+summary(data)
+
+par(mfrow=c(1,3))
+boxplot(A)
+boxplot(B)
+boxplot(C)
+```
+There is seems to be an outlier in C = -10000.
+
+# Empirical distributions of all predictors
+```{r}
+# Remove outlier in C = -10000
+idx <- which(C == -10000)
+data <- data[-c(idx),]
+
+cor(data)
+plot(data) 
+```
+Correlation of A and C is 0.01053607, and correlation of B and C is 0.6185160 Both A and B seem to have a little to some relationship with C. There does not seem to be a relationship between A and B.
+
+# Square-root transformation
+```{r}
+C <- data$C
+A_sqrt <- sqrt(data$A)
+B_sqrt <- sqrt(data$B)
+
+data_sqrt <- data.frame(A_sqrt,B_sqrt,C)
+pairs(data_sqrt)
+```
+
+# Square transformation
+```{r}
+C <- data$C
+A_sq <- (data$A)^2
+B_sq <- (data$B)^2
+
+data_sq <- data.frame(A_sq,B_sq,C)
+pairs(data_sq)
+```
+The square transformation of A and B seems to have a better linear relationship with C. The square-root transform is inappropriate and should be avoided because some variables take or may take negative values - several "NaN" were generated.
+
+# Train-test split
+```{r}
+set.seed(1234) # set seed for replication
+train_size <- floor(0.75 * nrow(data))
+train_samp <- sample(seq_len(nrow(data)), size = train_size)
+
+train <- data[train_samp, ] # 75% train set
+test <-  data[-train_samp, ] # 25% test set
+```
+
+```{r}
+mod1 <- lm(C ~ A + B, train)
+mod2 <- lm(C ~ I(A^2) + I(B^2), train)
+mod3 <- lm(C ~ A + B + I(B^2), train)
+mod4 <- lm(C ~ A + B + I(B^2) + I(B^3), train)
+mod5 <- lm(C ~ A + B + I(B^2) + I(B^3) + I(B^4), train)
+mod6 <- lm(C ~ I(A^2) + B, train)
+mod7 <- lm(C ~ A + I(A^2) + B, train)
+mod8 <- lm(C ~ A + I(A^2) + I(A^3) + B, train)
+```
+
+# Diagnostics for MLR
+```{r}
+par(mfrow=c(2,2))
+plot(mod1)
+plot(mod2)
+plot(mod3)
+plot(mod4)
+plot(mod5)
+plot(mod6)
+plot(mod7)
+plot(mod8)
+```
+
+# AIC as selection criterion
+```{r}
+step(mod1, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+step(mod2, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+step(mod3, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+step(mod4, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+step(mod5, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+step(mod6, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+step(mod7, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+step(mod8, direction = "backward", step=1) # we want to minimizethe the AIC criteria
+```
+B^2 should be dropped from model 4, and A should be dropped from models 7 and 8 to yield the best improvement.
+
+# BIC as selection criterion
+```{r}
+n <- nrow(train)
+step(mod1,direction="backward", k=log(n), step=1)
+step(mod2,direction="backward", k=log(n), step=1)
+step(mod3,direction="backward", k=log(n), step=1)
+step(mod4,direction="backward", k=log(n), step=1)
+step(mod5,direction="backward", k=log(n), step=1)
+step(mod6,direction="backward", k=log(n), step=1)
+step(mod7,direction="backward", k=log(n), step=1)
+step(mod8,direction="backward", k=log(n), step=1)
+```
+Using BIC as selection criterion, B^2 should be dropped from models 3, 4, and 5, and A should be dropped from models 7 and 8.
+
+# Adjusted R2 as selection criterion
+```{r}
+R1 <- lm(C ~ A + B, train)
+R2 <- lm(C ~ I(A^2) + I(B^2), train)
+R3 <- lm(C ~ A + B + I(B^2), train)
+R4 <- lm(C ~ A + B + I(B^2) + I(B^3), train)
+R5 <- lm(C ~ A + B + I(B^2) + I(B^3) + I(B^4), train)
+R6 <- lm(C ~ I(A^2) + B, train)
+R7 <- lm(C ~ A + I(A^2) + B, train)
+R8 <- lm(C ~ A + I(A^2) + I(A^3) + B, train)
+
+print(c(summary(R1)$adj.r.squared, 
+        summary(R2)$adj.r.squared,
+        summary(R3)$adj.r.squared,
+        summary(R4)$adj.r.squared,
+        summary(R5)$adj.r.squared,
+        summary(R6)$adj.r.squared,
+        summary(R7)$adj.r.squared,
+        summary(R8)$adj.r.squared))
+```
+Model 2 has the lowest adjusted R2 value, and models 5-8 have the highest adjusted R2 values, with model 5 having the highest adjusted R2 value. 
+
+# Model Prediction
+```{r}
+predict_mod1 <- predict(mod1, test)
+predict_mod2 <- predict(mod2, test)
+predict_mod3 <- predict(mod3, test)
+predict_mod4 <- predict(mod4, test)
+predict_mod5 <- predict(mod5, test)
+predict_mod6 <- predict(mod6, test)
+predict_mod7 <- predict(mod7, test)
+predict_mod8 <- predict(mod8, test)
+
+
+### MSE of both models
+mse1 <- mean((test$C - predict_mod1)^2)
+mse2 <- mean((test$C - predict_mod2)^2)
+mse3 <- mean((test$C - predict_mod3)^2)
+mse4 <- mean((test$C - predict_mod4)^2)
+mse5 <- mean((test$C - predict_mod5)^2)
+mse6 <- mean((test$C - predict_mod6)^2)
+mse7 <- mean((test$C - predict_mod7)^2)
+mse8 <- mean((test$C - predict_mod8)^2)
+
+# Average Squared Prediction Error Table
+mat <- matrix(c(mean_AIC, mean_sqrt_AIC, mean_sq_AIC, mean_BIC, mean_sqrt_BIC, mean_sq_BIC, mean_R2, mean_sqrt_R2, mean_sq_R2), ncol=3, byrow=FALSE)
+rownames(mat) <- c("Original Model","Square-root Transformation Model", "Square Transformation Model")
+colnames(mat) <- c("AIC", "BIC", "Adjusted R2")
+as.table(mat)
+
+print(c(mse1,mse2,mse3,mse4,mse4,mse6,mse7,mse8))
+```
+Model 7 has the lowest MSE and Model 2 has the largest MSE. Models 6-8 which have the transformation on variable A seem to have lower MSE than Models 1-5 which have the transformation on variable B.
+
+Overall, using AIC, BIC, and adjusted R2 as seleection criteria, model 6 seem to be the best fitting model with I(A^2) and B.
